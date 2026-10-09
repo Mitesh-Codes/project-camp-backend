@@ -1,7 +1,7 @@
 {
   "name": "projectcamp",
   "version": "1.0.0",
-  "description": "RESTful backend API for a collaborative project management system.",
+  "description": "RESTful backend API for the collaborative project management system.",
   "license": "ISC",
   "author": "Mitesh Kumar",
   "type": "module",
