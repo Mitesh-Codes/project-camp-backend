@@ -1,6 +1,6 @@
 # Project Camp Backend
 
-A REST API for collaborative project management. Project Camp provides authentication, project and team management, tasks and subtasks, project notes, and task attachments.
+A REST API for collaborative project management. Project Camp provides user authentication, project and team management, tasks and subtasks, project notes, and file attachments.
 
 ## Features
 
@@ -40,9 +40,9 @@ npm ci
 
 ### Configure environment
 
-Create a `.env` file in the project root and set the following variables. Replace the sample values with your own. Keep `.env` private and do not commit it.
+Create a `.env` file in the project root. Replace the sample values with your own, and do not commit the file.
 
-```dotenv
+```env
 PORT=3000
 MONGO_URI=mongodb://127.0.0.1:27017/projectcamp
 CORS_ORIGIN=http://localhost:5173
@@ -144,20 +144,20 @@ Registration accepts `username`, `email`, and `password`; `fullName` is optional
 | `PUT` | `/projects/:projectId/members/:userId` | Project admin |
 | `DELETE` | `/projects/:projectId/members/:userId` | Project admin |
 
-Creating a project assigns the creator the `admin` role for that project. Project creation accepts `name` and an optional `description`. Adding a member accepts `email` and `role`; changing a member’s role accepts `newRole`.
+Creating a project assigns the creator the `admin` role. Project creation accepts `name` and an optional `description`. Adding a member accepts `email` and `role`; changing a member’s role accepts `newRole`.
 
 ### Tasks and subtasks
 
 | Method | Endpoint | Access |
 | --- | --- | --- |
 | `GET` | `/tasks/:projectId` | Project member |
-| `POST` | `/tasks/:projectId` | Project admin |
+| `POST` | `/tasks/:projectId` | Project admin or project admin role |
 | `GET` | `/tasks/:projectId/t/:taskId` | Project member |
-| `PUT` | `/tasks/:projectId/t/:taskId` | Project admin |
-| `DELETE` | `/tasks/:projectId/t/:taskId` | Project admin |
-| `POST` | `/tasks/:projectId/t/:taskId/subtasks` | Project admin |
+| `PUT` | `/tasks/:projectId/t/:taskId` | Project admin or project admin role |
+| `DELETE` | `/tasks/:projectId/t/:taskId` | Project admin or project admin role |
+| `POST` | `/tasks/:projectId/t/:taskId/subtasks` | Project admin or project admin role |
 | `PUT` | `/tasks/:projectId/st/:subtaskId` | Project member |
-| `DELETE` | `/tasks/:projectId/st/:subtaskId` | Project admin |
+| `DELETE` | `/tasks/:projectId/st/:subtaskId` | Project admin or project admin role |
 
 Task statuses are `todo`, `in_progress`, and `done`.
 
@@ -227,5 +227,4 @@ src/
 | Command | Description |
 | --- | --- |
 | `npm run dev` | Start the development server with Nodemon |
-| `npm start` | Start the server |# Project Camp Backend
-
+| `npm start` | Start the server |
