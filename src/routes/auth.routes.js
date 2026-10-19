@@ -11,7 +11,7 @@ import {
   resetForgottenPassword,
   verifyEmail,
 } from "../controllers/auth.controllers.js";
-import { validate } from '../middlewares/validators.middleware.js';
+import { validate } from '../middlewares/validators.middlewares.js';
 import {
   userChangeCurrentPasswordValidator,
   userForgotPasswordValidator,
