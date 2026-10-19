@@ -1,6 +1,9 @@
 import { User } from "../models/user.models.js";
 import { Project } from "../models/project.models.js";
 import { ProjectMember } from "../models/projectmember.models.js";
+import { Tasks as Task } from "../models/task.models.js";
+import { Subtask } from "../models/subtask.models.js";
+import { ProjectNote } from "../models/note.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { asyncHandler } from "../utils/async-handler.js";
@@ -101,7 +104,7 @@ const updateProject = asyncHandler(async (req, res) => {
       name,
       description,
     },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   if (!project) {
@@ -114,10 +117,22 @@ const updateProject = asyncHandler(async (req, res) => {
 
 const deleteProject = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
-  const project = await Project.findByIdAndDelete(projectId);
+  const project = await Project.findById(projectId);
   if (!project) {
     throw new ApiError(404, "Project not found");
   }
+
+  const tasks = await Task.find({ project: projectId }).select("_id");
+  const taskIds = tasks.map(({ _id }) => _id);
+
+  await Promise.all([
+    Subtask.deleteMany({ task: { $in: taskIds } }),
+    Task.deleteMany({ project: projectId }),
+    ProjectNote.deleteMany({ project: projectId }),
+    ProjectMember.deleteMany({ project: projectId }),
+  ]);
+  await Project.deleteOne({ _id: projectId });
+
   return res
     .status(200)
     .json(new ApiResponse(200, project, "Project deleted successfully"));
@@ -140,7 +155,7 @@ const addMembersToProject = asyncHandler(async (req, res) => {
     },
     {
       upsert: true,
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     },
   );
@@ -221,7 +236,7 @@ const updateMemberRole = asyncHandler(async (req, res) => {
       $set: { role: newRole },
     },
     {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     },
   );

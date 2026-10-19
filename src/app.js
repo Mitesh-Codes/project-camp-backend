@@ -38,4 +38,20 @@ app.get("/", (req,res) => {
     res.send("Welcome to BaseCamp");
 });
 
+app.use((err, req, res, next) => {
+    if (res.headersSent) {
+        return next(err);
+    }
+
+    const statusCode = err.statusCode || err.status || 500;
+
+    return res.status(statusCode).json({
+        statusCode,
+        data: null,
+        message: err.message || "Internal server error",
+        success: false,
+        errors: err.errors || [],
+    });
+});
+
 export default app;

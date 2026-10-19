@@ -58,7 +58,7 @@ const updateProjectNote = asyncHandler(async (req, res) => {
   const note = await ProjectNote.findOneAndUpdate(
     { _id: noteId, project: projectId },
     { $set: { content: content.trim() } },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
 
   if (!note) {

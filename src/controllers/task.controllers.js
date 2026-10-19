@@ -20,8 +20,8 @@ const getTasks = asyncHandler(async (req, res) => {
         .populate("assignedTo", "avatar username fullName");
 
     return res
-        .status(201)
-        .json(new ApiResponse(201, tasks, "Tasks fetched successfully"));
+        .status(200)
+        .json(new ApiResponse(200, tasks, "Tasks fetched successfully"));
 });
 
 const createTask = asyncHandler(async (req, res) => {
@@ -131,8 +131,8 @@ const getTaskbyId = asyncHandler(async (req, res) => {
     }
 
     return res
-        .status(201)
-        .json(new ApiResponse(201, task[0], "Task fetched successfully"));
+        .status(200)
+        .json(new ApiResponse(200, task[0], "Task fetched successfully"));
 });
 
 const updateTask = asyncHandler(async (req, res) => {
@@ -153,7 +153,7 @@ const updateTask = asyncHandler(async (req, res) => {
       },
       update,
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       },
     );
@@ -169,7 +169,7 @@ const updateTask = asyncHandler(async (req, res) => {
 
 const deleteTask = asyncHandler(async (req, res) => {
     const { taskId } = req.params;
-    const task = await Task.findOneAndDelete({
+  const task = await Task.findOne({
       _id: taskId,
       project: req.params.projectId,
     });
@@ -177,6 +177,9 @@ const deleteTask = asyncHandler(async (req, res) => {
     if(!task) {
         throw new ApiError(404, "Task not found");
     }
+
+  await Subtask.deleteMany({ task: taskId });
+  await Task.deleteOne({ _id: taskId, project: req.params.projectId });
 
     return res
         .status(200)
@@ -243,7 +246,7 @@ const updateSubTask = asyncHandler(async (req, res) => {
   const subtask = await Subtask.findByIdAndUpdate(
     subtaskId,
     { $set: update },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
 
   if (!subtask) {
