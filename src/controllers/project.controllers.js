@@ -5,7 +5,7 @@ import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import mongoose from "mongoose";
-import { AvailableUserRole } from "../utils/constants.js";
+import { UserRolesEnum, AvailableUserRole } from "../utils/constants.js";
 
 
 
