@@ -6,7 +6,7 @@ const subtaskSchema = new Schema({
         required: true,
         trim: true
     },
-    tasks: {
+    task: {
         type: Schema.Types.ObjectId,
         ref: "Task",
         required: true
@@ -20,6 +20,7 @@ const subtaskSchema = new Schema({
         ref: "User",
         required: true
     }
+
 }, {timestamps: true});
 
 export const Subtask = mongoose.model("Subtask", subtaskSchema);

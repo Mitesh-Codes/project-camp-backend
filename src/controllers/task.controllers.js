@@ -1,12 +1,12 @@
 import { User } from "../models/user.models.js";
 import { Project } from "../models/project.models.js";
-import { Task } from "../models/task.models.js";
+import { Tasks as Task } from "../models/task.models.js";
 import { Subtask } from "../models/subtask.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import mongoose from "mongoose";
-import { AvailableUserRole } from "../utils/constants.js";
+import { UserRolesEnum } from "../utils/constants.js";
 
 
 const getTasks = asyncHandler(async (req, res) => {
@@ -17,7 +17,7 @@ const getTasks = asyncHandler(async (req, res) => {
     }
     const tasks = await Task.find({ 
         project: new mongoose.Types.ObjectId(projectId) })
-        .populate("assignedTo", "avatar username fullname");
+        .populate("assignedTo", "avatar username fullName");
 
     return res
         .status(201)
@@ -37,7 +37,7 @@ const createTask = asyncHandler(async (req, res) => {
 
     const attachments = files.map((file) => {
         return {
-            url: `${process.env.SERVER_URL}/images/${file.originalname}`,
+            url: `${process.env.SERVER_URL}/images/${file.filename}`,
             mimetype: file.mimetype,
             size: file.size,
         }
@@ -62,65 +62,68 @@ const createTask = asyncHandler(async (req, res) => {
 const getTaskbyId = asyncHandler(async (req, res) => {
     const { taskId } = req.params;
     const task = await Task.aggregate([
-        {
-            $match: {
-                _id: new mongoose.Types.ObjectId(taskId)
-            }
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(taskId),
+          project: new mongoose.Types.ObjectId(req.params.projectId),
         },
-        {
-            $lookup: {
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "assignedTo",
+          foreignField: "_id",
+          as: "assignedTo",
+          pipeline: [
+            {
+              $project: {
+                _id: 1,
+                username: 1,
+                fullName: 1,
+                avatar: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $lookup: {
+          from: "subtasks",
+          localField: "_id",
+          foreignField: "task",
+          as: "subtasks",
+          pipeline: [
+            {
+              $lookup: {
                 from: "users",
-                localField: "assignedTo",
+                localField: "createdBy",
                 foreignField: "_id",
-                as: "assignedTo",
+                as: "createdBy",
                 pipeline: [
-                    {
-                        _id: 1,
-                        username: 1,
-                        fullname: 1,
-                        avatar: 1
-                    }
-                ]
-            }
-        },
-        {
-            $lookup: {
-                from: "subtasks",
-                localField: "_id",
-                foreignField: "task",
-                as: "subtasks",
-                pipeline: [
-                    {
-                        $lookup: {
-                            from: "users",
-                            localField: "createdBy",
-                            foreignField: "_id",
-                            as: "createdBy",
-                            pipeline: [
-                                {
-                                    $project: {
-                                        _id: 1,
-                                        username: 1,
-                                        fullname: 1,
-                                        avatar: 1
-                                    }
-                                }
-                            ]
-                        }
+                  {
+                    $project: {
+                      _id: 1,
+                      username: 1,
+                      fullName: 1,
+                      avatar: 1,
                     },
-                    {
-                        $addFields: {
-                            createdBy: { $arrayElemAt: ["$createdBy", 0] }
-                        }
-                    }
-                ]
-            }
+                  },
+                ],
+              },
+            },
+            {
+              $addFields: {
+                createdBy: { $arrayElemAt: ["$createdBy", 0] },
+              },
+            },
+          ],
         },
-        {
-            $addFields: {
-                assignedTo: { $arrayElemAt: ["$assignedTo", 0] }
-            }
-        }
+      },
+      {
+        $addFields: {
+          assignedTo: { $arrayElemAt: ["$assignedTo", 0] },
+        },
+      },
     ]);
 
     if(!task || task.length === 0) {
@@ -135,17 +138,24 @@ const getTaskbyId = asyncHandler(async (req, res) => {
 const updateTask = asyncHandler(async (req, res) => {
     const { taskId } = req.params;
     const { title, description, status, assignedTo, attachments } = req.body;
+    const update = { title, description, status, attachments };
 
-    const task = await Task.findByIdAndUpdate(
-        taskId,
-        {
-            title,
-            description,
-            status,
-            assignedTo: new mongoose.Types.ObjectId(assignedTo),
-            attachments
-        },
-        { new: true }
+    if (assignedTo !== undefined) {
+      update.assignedTo = assignedTo
+        ? new mongoose.Types.ObjectId(assignedTo)
+        : null;
+    }
+
+    const task = await Task.findOneAndUpdate(
+      {
+        _id: taskId,
+        project: req.params.projectId,
+      },
+      update,
+      {
+        new: true,
+        runValidators: true,
+      },
     );
 
     if(!task) {
@@ -159,7 +169,10 @@ const updateTask = asyncHandler(async (req, res) => {
 
 const deleteTask = asyncHandler(async (req, res) => {
     const { taskId } = req.params;
-    const task = await Task.findByIdAndDelete(taskId);
+    const task = await Task.findOneAndDelete({
+      _id: taskId,
+      project: req.params.projectId,
+    });
 
     if(!task) {
         throw new ApiError(404, "Task not found");
@@ -171,16 +184,23 @@ const deleteTask = asyncHandler(async (req, res) => {
 });
 
 const createSubTask = asyncHandler(async (req, res) => {
+    const { title, isCompleted } = req.body;
     const { taskId } = req.params;
-    const { title, description, status, assignedTo, attachments } = req.body;
+
+    const task = await Task.findOne({
+      _id: taskId,
+      project: req.params.projectId,
+    });
+
+    if (!task) {
+      throw new ApiError(404, "Task not found in this project");
+    }
 
     const subtask = await Subtask.create({
         title,
-        description,
-        status,
         task: new mongoose.Types.ObjectId(taskId),
-        assignedTo: new mongoose.Types.ObjectId(assignedTo),
-        attachments
+        isCompleted,
+        createdBy: new mongoose.Types.ObjectId(req.user._id),
     });
 
     if(!subtask) {
@@ -193,41 +213,73 @@ const createSubTask = asyncHandler(async (req, res) => {
 });
 
 const updateSubTask = asyncHandler(async (req, res) => {
-    const { subtaskId } = req.params;
-    const { title, description, status, assignedTo, attachments } = req.body;
+  const { subtaskId } = req.params;
+  const { title, isCompleted } = req.body;
 
-    const subtask = await Subtask.findByIdAndUpdate(
-        subtaskId,
-        {
-            title,
-            description,
-            status,
-            assignedTo: new mongoose.Types.ObjectId(assignedTo),
-            attachments
-        },
-        { new: true }
-    );
-
-    if(!subtask) {
-        throw new ApiError(404, "Subtask not found");
+  const update = {};
+  if (req.user.role === UserRolesEnum.MEMBER) {
+    if (title !== undefined || typeof isCompleted !== "boolean") {
+      throw new ApiError(400, "Members may only update subtask completion");
     }
+    update.isCompleted = isCompleted;
+  } else {
+    if (title !== undefined) update.title = title;
+    if (isCompleted !== undefined) update.isCompleted = isCompleted;
+  }
 
-    return res
-        .status(200)
-        .json(new ApiResponse(200, subtask, "Subtask updated successfully"));
+  const existingSubtask = await Subtask.findById(subtaskId).select("task");
+  if (!existingSubtask) {
+    throw new ApiError(404, "Subtask not found");
+  }
+
+  const parentTask = await Task.findOne({
+    _id: existingSubtask.task,
+    project: req.params.projectId,
+  });
+  if (!parentTask) {
+    throw new ApiError(404, "Subtask not found in this project");
+  }
+
+  const subtask = await Subtask.findByIdAndUpdate(
+    subtaskId,
+    { $set: update },
+    { new: true, runValidators: true },
+  );
+
+  if (!subtask) {
+    throw new ApiError(404, "Subtask not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, subtask, "Subtask updated successfully"));
 });
 
 const deleteSubTask = asyncHandler(async (req, res) => {
-    const { subtaskId } = req.params;
-    const subtask = await Subtask.findByIdAndDelete(subtaskId);
+  const { subtaskId } = req.params;
 
-    if(!subtask) {
-        throw new ApiError(404, "Subtask not found");
-    }
+  const existingSubtask = await Subtask.findById(subtaskId).select("task");
+  if (!existingSubtask) {
+    throw new ApiError(404, "Subtask not found");
+  }
 
-    return res
-        .status(200)
-        .json(new ApiResponse(200, subtask, "Subtask deleted successfully"));
+  const parentTask = await Task.findOne({
+    _id: existingSubtask.task,
+    project: req.params.projectId,
+  });
+  if (!parentTask) {
+    throw new ApiError(404, "Subtask not found in this project");
+  }
+
+  const subtask = await Subtask.findByIdAndDelete(subtaskId);
+
+  if (!subtask) {
+    throw new ApiError(404, "Subtask not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, subtask, "Subtask deleted successfully"));
 });
 
 export {

@@ -8,11 +8,11 @@ const userSchema =new Schema(
         avatar: {
             type: {
                 url: String,
-                loclaPath: String,
+                localPath: String,
             },
             default: {
                 url: "https://placehold.co/200x200",
-                loclaPath: ""
+                localPath: ""
             }
         },
         username: {
